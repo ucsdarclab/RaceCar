@@ -1,3 +1,6 @@
+# RaceCar
+
+A python environment to simulate a race car.
 ## Install
 
 To install the package run,
