@@ -32,6 +32,8 @@ class SDRaceCar():
         self.steer_min = -1.047  # min steering angle
         self.F_z = self.m * 9.81 / 1000  # kN
 
+        self.Horizon = 100
+
         #parameters from optimization that remain constant
         self.alpha_slip = np.arctan2(3 * self.mu[0] * self.F_z,
                                      self.C_alpha)  #Slip parameter
@@ -50,16 +52,21 @@ class SDRaceCar():
             self.track = 20 * np.vstack(
                 [np.cos(t), np.multiply(np.sin(t), np.cos(t))])
             self.track_boundaries = [-40, 40, -20, 20]
+            self.maxStep = 500
         elif track == "Linear":
             self.track = np.vstack([
                 10 * np.linspace(0, 100, self.track_len),
                 0 * np.ones(self.track_len)
             ])
             self.track_boundaries = [-5, 35, -20, 20]
+            self.maxStep = 50
         else:  # default to circle track
             t = np.linspace(-1 / 2 * np.pi, 3 / 2 * np.pi, self.track_len)
             self.track = 10 * np.vstack([np.cos(t), np.sin(t) + 1])
             self.track_boundaries = [-30, 30, -20, 40]
+            self.maxStep = 350
+        self.distance_threshold = 4
+        self.stepCount = 0
         self.closest_track_ind = 0  # index to pt on track closest to current position
 
         # Render settings
@@ -94,13 +101,20 @@ class SDRaceCar():
         return self.get_observation()
 
     def reset(self):
+        self.stepCount = 0
         reset_values = np.array([-1.0, 0, 0, 0, 0, 0, 0, 0])
         return self._set_internal_state(reset_values)
 
     def get_observation(self):
         #returns a vector of observations
+        if self.closest_track_ind + self.Horizon >= self.track_len:
+            X_at_H = self.track[:, self.closest_track_ind + self.Horizon -
+                                self.track_len]
+        else:
+            X_at_H = self.track[:, self.closest_track_ind + self.Horizon]
         return (np.array(
-            [self.x, self.y, self.psi, self.v_x, self.v_y, self.omega]))
+            [self.x, self.y, self.psi, self.v_x, self.v_y, self.omega,
+             X_at_H]))
 
     def step(self, action):
         # Steps the simulation one time unit into the future
@@ -108,6 +122,7 @@ class SDRaceCar():
         #   action is between [-1,1]
         steer = action[0]
         thrust = action[1]
+        self.stepCount +=1
 
         # check action limits
         if steer >= 1:
@@ -188,17 +203,23 @@ class SDRaceCar():
         self.thrust = thrust
 
         done = False
+        # Distance of car from the track
+        distance_check = np.hypot(self.x - self.closest_track_pt_x,
+                                  self.y - self.closest_track_pt_y)
+        if distance_check > self.distance_threshold:
+            done = True
+        if self.stepCount >= self.maxStep:
+            done = True
         if (self.x < self.track_boundaries[0]
                 or self.x > self.track_boundaries[1]
                 or self.y < self.track_boundaries[2]
                 or self.y > self.track_boundaries[3]):
             done = True
-
         return self.get_observation(), self.reward(), done
 
     def reward(self):
         diff = self.closest_track_pt_x - self.x, self.closest_track_pt_y - self.y
-        reward1 = np.sqrt(diff[0]**2 + diff[1]**2)
+        reward1 = -np.sqrt(diff[0]**2 + diff[1]**2)
         reward2 = np.sqrt(self.v_x**2 + self.v_y**2)
         return 0.01 * (reward1 + 10 * reward2)
 
