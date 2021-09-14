@@ -215,8 +215,8 @@ class SDRaceCar():
                 or self.y < self.track_boundaries[2]
                 or self.y > self.track_boundaries[3]):
             done = True
-        return self.get_observation(), self.reward(), done
-
+        return self.get_observation(), self.reward(), done, {}
+        
     def reward(self):
         diff = self.closest_track_pt_x - self.x, self.closest_track_pt_y - self.y
         reward1 = -np.sqrt(diff[0]**2 + diff[1]**2)
