@@ -114,7 +114,7 @@ class SDRaceCar():
             X_at_H = self.track[:, self.closest_track_ind + self.Horizon]
         return (np.array(
             [self.x, self.y, self.psi, self.v_x, self.v_y, self.omega,
-             X_at_H]))
+             X_at_H], dtype=object))
 
     def step(self, action):
         # Steps the simulation one time unit into the future
